@@ -68,13 +68,14 @@ void testCPU(bool (*func)(uint64_t)){
 
 void testGPU(bool (*func)(uint64_t)){
 
-    uint64_t num[6] = {524287, 2147483647, 2305843009213693951, 274876858369, 4611686014132420609, 1125897758834689 };
-    bool res[6];
+    const int testlen = 3;
+    uint64_t num[testlen] = {524287, 2305843009213693951, 4611686014132420609 };
+    bool res[testlen];
 
     std::cout << "GPU primality test:\n";
     auto start = std::chrono::high_resolution_clock::now();    
 
-    for(int i = 0; i < 6; i++){
+    for(int i = 0; i < testlen; i++){
         res[i] = func(num[i]);
         std::cout << "Is number " << num[i] << " prime?: ";
         if(res[i] == 1){
@@ -88,22 +89,24 @@ void testGPU(bool (*func)(uint64_t)){
     auto stop = std::chrono::high_resolution_clock::now();
 
     auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(stop - start);
-    std::cout << "CPU test duration: " << duration.count() << " milliseconds" << std::endl;
+    std::cout << "GPU test duration: " << duration.count() << " milliseconds" << std::endl;
 
 }
 
 __global__ void ker_GPUprime(uint64_t* num, uint32_t* res, uint32_t* maxind){
 
-    uint32_t index = (threadIdx.x + blockIdx.x * blockDim.x);
-    uint32_t realindex = 5 + index * 6;
-
-    if(realindex <= *maxind-2){
-        if(*num % realindex == 0 || *num % (realindex+2) == 0)
+    for(uint32_t i = threadIdx.x + blockIdx.x * blockDim.x;
+        5 + i * 6 <= *maxind - 2;
+        i += blockDim.x + gridDim.x )
         {
-            uint32_t block = index / 32;
-            res[block] = 0;
+            uint32_t realindex = 5 + i * 6;
+
+            if(*num % realindex == 0 || *num % (realindex+2) == 0)
+            {
+                uint32_t block = i / 32;
+                res[block] = 0;
+            }
         }
-    }
 }
 
 
@@ -129,13 +132,17 @@ bool GPUprime(uint64_t num){
     cudaMemcpy(maxind, &sqrtnum, 32, cudaMemcpyHostToDevice);
     cudaMemcpy(dnum, &num, 64, cudaMemcpyHostToDevice);
     cudaMemcpy(dres, res, reslen*4, cudaMemcpyHostToDevice);
-    // size_t gsize = bitnum/32 + (bitnum%32 !=0);
-    dim3 blocksize= {32};
-    dim3 gridsize = {bitnum/32 + (bitnum%32 !=0)};
 
+    uint32_t threads = 512;
+    dim3 gridsize = {bitnum/threads + (bitnum%threads !=0)};
+
+    int numSMs;
+    cudaDeviceGetAttribute(&numSMs, cudaDevAttrMultiProcessorCount, 0);
+    // std::cout << "number od sms: "<< numSMs << std::endl;
+    // std::cout << "bitnum: " << bitnum << std::endl;
 
     
-    ker_GPUprime<<<gridsize, blocksize>>>(dnum, dres, maxind);
+    ker_GPUprime<<<numSMs, threads>>>(dnum, dres, maxind);
 
     cudaMemcpy(res, dres, reslen*4, cudaMemcpyDeviceToHost);
     cudaDeviceSynchronize();
@@ -166,7 +173,7 @@ bool GPUprime(uint64_t num){
 int main() {
 
     // CPU test
-    testCPU(&CPUprime);
+    // testCPU(&CPUprime);
 
     // Gpu test
     testGPU(&GPUprime);
