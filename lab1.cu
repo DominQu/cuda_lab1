@@ -93,7 +93,7 @@ void testGPU(bool (*func)(uint64_t)){
 
 }
 
-__global__ void ker_GPUprime(uint64_t* num, int* res, uint32_t* maxind){
+__global__ void ker_GPUprime(uint64_t* num, uint32_t* res, uint32_t* maxind){
 
     for(uint32_t i = threadIdx.x + blockIdx.x * blockDim.x;
         5 + i * 6 <= *maxind - 2;
@@ -103,7 +103,8 @@ __global__ void ker_GPUprime(uint64_t* num, int* res, uint32_t* maxind){
 
             if(*num % realindex == 0 || *num % (realindex+2) == 0)
             {
-                *res = 0;
+                uint32_t block = i / 32;
+                res[block] = 0;
             }
         }
 }
@@ -114,24 +115,23 @@ bool GPUprime(uint64_t num){
     uint32_t sqrtnum = (uint32_t)std::floor(std::sqrt(num));
     uint32_t bitnum = ((sqrtnum - 5) / 6 + 1);   //number of threads
     uint32_t reslen = (bitnum / 64 + (bitnum % 64 != 0)) * 2;
-    // uint32_t *res = new uint32_t[reslen];
+    uint32_t *res = new uint32_t[reslen];
 
-    // for(int i = 0 ; i < reslen; i++){
-    //     res[i] = (UINT_MAX);
-    // }
+    for(int i = 0 ; i < reslen; i++){
+        res[i] = (UINT_MAX);
+    }
 
-    int res = 1;
     uint64_t* dnum;
-    int* dres;
+    uint32_t* dres;
     uint32_t* maxind;
 
     auto start = std::chrono::high_resolution_clock::now();
     cudaMalloc(&maxind, 32);
     cudaMalloc(&dnum, 64);
-    cudaMalloc(&dres, sizeof(int));
+    cudaMalloc(&dres, reslen*4);
     cudaMemcpy(maxind, &sqrtnum, 32, cudaMemcpyHostToDevice);
     cudaMemcpy(dnum, &num, 64, cudaMemcpyHostToDevice);
-    cudaMemcpy(dres, &res, sizeof(int), cudaMemcpyHostToDevice);
+    cudaMemcpy(dres, res, reslen*4, cudaMemcpyHostToDevice);
 
     uint32_t threads = 512;
     dim3 gridsize = {bitnum/threads + (bitnum%threads !=0)};
@@ -143,24 +143,22 @@ bool GPUprime(uint64_t num){
 
     
     ker_GPUprime<<<numSMs, threads>>>(dnum, dres, maxind);
-    cudaMemcpy(&res, dres, sizeof(int), cudaMemcpyDeviceToHost);
+
+    cudaMemcpy(res, dres, reslen*4, cudaMemcpyDeviceToHost);
     cudaDeviceSynchronize();
     auto stop = std::chrono::high_resolution_clock::now();
     bool prime = true;
-    // for(int j = 0; j < reslen ;j++){
+    for(int j = 0; j < reslen ;j++){
         
-    //     if(res[j] != UINT_MAX){
-    //         prime = false;
-    //     }
-    // }
-    if(res == 0){
-        prime  = false;
+        if(res[j] != UINT_MAX){
+            prime = false;
+        }
     }
 
     cudaFree(dnum);
     cudaFree(dres);
     cudaFree(maxind);
-    // delete[] res;
+    delete[] res;
 
 
     auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(stop - start);
