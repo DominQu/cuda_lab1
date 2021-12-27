@@ -68,8 +68,6 @@ void testCPU(bool (*func)(uint64_t)){
 
 }
 
-
-
 // GPU section
 
 
@@ -103,7 +101,7 @@ __global__ void dev_GPUmonolithic(uint64_t* num, uint32_t* res, uint32_t* maxind
     }
 }
 
-bool GPUgridstride(uint64_t num, bool gridstride){
+bool GPUprime(uint64_t num, bool gridstride){
 
     auto start = std::chrono::high_resolution_clock::now();
 
@@ -177,62 +175,6 @@ bool GPUgridstride(uint64_t num, bool gridstride){
 
 }
 
-// adding naive gpu
-
-
-
-// bool GPUprime(uint64_t num){
-
-//     uint32_t sqrtnum = (uint32_t)std::floor(std::sqrt(num));
-//     uint32_t bitnum = ((sqrtnum - 5) / 6 + 1);
-//     uint32_t reslen = (bitnum / 64 + (bitnum % 64 != 0)) * 2;
-//     uint32_t *res = new uint32_t;
-
-//     *res = 1;
-
-//     uint64_t* dnum;
-//     uint32_t* dres;
-//     uint32_t* maxind;
-
-//     auto start = std::chrono::high_resolution_clock::now();
-//     cudaMalloc(&maxind, 4);
-//     cudaMalloc(&dnum, 8);
-//     cudaMalloc(&dres, reslen*4);
-//     cudaMemcpy(maxind, &sqrtnum, 4, cudaMemcpyHostToDevice);
-//     cudaMemcpy(dnum, &num, 8, cudaMemcpyHostToDevice);
-//     cudaMemcpy(dres, res, reslen*4, cudaMemcpyHostToDevice);
-//     dim3 blocksize= {32};
-//     dim3 gridsize = {bitnum/32 + (bitnum%32 !=0)};
-    
-//     dev_GPUmonolithic<<<gridsize, blocksize>>>(dnum, dres, maxind);
-//     cudaDeviceSynchronize();
-
-//     cudaMemcpy(res, dres, reslen*4, cudaMemcpyDeviceToHost);
-//     auto stop = std::chrono::high_resolution_clock::now();
-    
-//     bool prime = true;
-//     for(int j = 0; j < reslen ;j++){
-        
-//         if(res[j] != UINT_MAX){
-//             prime = false;
-//         }
-//     }
-
-//     cudaFree(dnum);
-//     cudaFree(dres);
-//     cudaFree(maxind);
-//     delete[] res;
-
-
-//     auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(stop - start);
-//     std::cout << "current number: " << duration.count() << " milliseconds" << std::endl;
-
-//     return prime;
-
-// }
-
-// ///////////
-
 
 void testGPU(bool (*func)(uint64_t, bool), bool gridstride = 1){
     // test numbers given in the task
@@ -270,14 +212,42 @@ void testGPU(bool (*func)(uint64_t, bool), bool gridstride = 1){
 
 }
 
+void usertest(){
+
+    uint64_t num;
+    std::cout << "Podaj liczbe do testu: ";
+    std::cin >> num;
+    bool cpures;
+    bool gpures;
+
+    std::cout << "\n";
+    cpures = CPUprime(num);
+    if(cpures ==1){
+        std::cout << "(CPU) Number " << num << " is prime" << std::endl;
+    }
+    else{
+        std::cout << "(CPU) Number " << num << " is not prime"<< std::endl;
+    }
+    gpures = GPUprime(num, 1);
+    if(gpures ==1){
+        std::cout << "(GPU) Number " << num << " is prime"<< std::endl;
+    }
+    else{
+        std::cout << "(GPU) Number " << num << " is not prime"<< std::endl;
+    }
+}
+
 
 int main() {
 
-    // CPU test
-    testCPU(&CPUprime);
+    // Aby przetestować liczby podane w instrukcji należy odkomentować poniższe funkcje.
+    // Funkcja testGPU może przyjąć jeden dodatkowy argument typu bool, który pozwala wybrać 
+    // czy używane będą monolityczne kernele czy pętla grid-stride.
 
-    // Gpu test
-    testGPU(&GPUgridstride);
+    // testCPU(&CPUprime);
+    // testGPU(&GPUprime);
+
+    usertest();
 
 
 }
