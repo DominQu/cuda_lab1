@@ -90,7 +90,20 @@ void dev_GPUgridstride(uint64_t* num, uint32_t* res, uint32_t* maxind){
         }
 }
 
-bool GPUgridstride(uint64_t num){
+__global__ void dev_GPUmonolithic(uint64_t* num, uint32_t* res, uint32_t* maxind){
+
+    uint32_t index = (threadIdx.x + blockIdx.x * blockDim.x);
+    uint32_t realindex = 5 + index * 6;
+
+    if(realindex <= *maxind-2){
+        if(*num % realindex == 0 || *num % (realindex+2) == 0)
+        {
+            *res = 0;
+        }
+    }
+}
+
+bool GPUgridstride(uint64_t num, bool gridstride){
 
     auto start = std::chrono::high_resolution_clock::now();
 
@@ -120,14 +133,26 @@ bool GPUgridstride(uint64_t num){
     cudaMemcpy(dnum, &num, 8, cudaMemcpyHostToDevice);
     cudaMemcpy(dres, res, 4, cudaMemcpyHostToDevice);
 
-    // number of threads and blocks
-    uint32_t threads = 1024;
-    int numSMs;
-    cudaDeviceGetAttribute(&numSMs, cudaDevAttrMultiProcessorCount, 0);
+    if(gridstride == 1){
 
-    // kernel call
-    dev_GPUgridstride<<<4*numSMs, threads>>>(dnum, dres, maxind);
-    cudaDeviceSynchronize();
+        // number of threads and blocks
+        uint32_t threads = 1024;
+        int numSMs;
+        cudaDeviceGetAttribute(&numSMs, cudaDevAttrMultiProcessorCount, 0);
+
+        // kernel call
+        dev_GPUgridstride<<<4*numSMs, threads>>>(dnum, dres, maxind);
+        cudaDeviceSynchronize();
+    }
+    else{
+        uint32_t bitnum = ((sqrtnum - 5) / 6 + 1);
+
+        dim3 blocksize= {32};
+        dim3 gridsize = {bitnum/32 + (bitnum%32 !=0)};
+        
+        dev_GPUmonolithic<<<gridsize, blocksize>>>(dnum, dres, maxind);
+        cudaDeviceSynchronize();
+    }
 
     // copy the solution and check it
     cudaMemcpy(res, dres, 4, cudaMemcpyDeviceToHost);
@@ -152,7 +177,64 @@ bool GPUgridstride(uint64_t num){
 
 }
 
-void testGPU(bool (*func)(uint64_t)){
+// adding naive gpu
+
+
+
+// bool GPUprime(uint64_t num){
+
+//     uint32_t sqrtnum = (uint32_t)std::floor(std::sqrt(num));
+//     uint32_t bitnum = ((sqrtnum - 5) / 6 + 1);
+//     uint32_t reslen = (bitnum / 64 + (bitnum % 64 != 0)) * 2;
+//     uint32_t *res = new uint32_t;
+
+//     *res = 1;
+
+//     uint64_t* dnum;
+//     uint32_t* dres;
+//     uint32_t* maxind;
+
+//     auto start = std::chrono::high_resolution_clock::now();
+//     cudaMalloc(&maxind, 4);
+//     cudaMalloc(&dnum, 8);
+//     cudaMalloc(&dres, reslen*4);
+//     cudaMemcpy(maxind, &sqrtnum, 4, cudaMemcpyHostToDevice);
+//     cudaMemcpy(dnum, &num, 8, cudaMemcpyHostToDevice);
+//     cudaMemcpy(dres, res, reslen*4, cudaMemcpyHostToDevice);
+//     dim3 blocksize= {32};
+//     dim3 gridsize = {bitnum/32 + (bitnum%32 !=0)};
+    
+//     dev_GPUmonolithic<<<gridsize, blocksize>>>(dnum, dres, maxind);
+//     cudaDeviceSynchronize();
+
+//     cudaMemcpy(res, dres, reslen*4, cudaMemcpyDeviceToHost);
+//     auto stop = std::chrono::high_resolution_clock::now();
+    
+//     bool prime = true;
+//     for(int j = 0; j < reslen ;j++){
+        
+//         if(res[j] != UINT_MAX){
+//             prime = false;
+//         }
+//     }
+
+//     cudaFree(dnum);
+//     cudaFree(dres);
+//     cudaFree(maxind);
+//     delete[] res;
+
+
+//     auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(stop - start);
+//     std::cout << "current number: " << duration.count() << " milliseconds" << std::endl;
+
+//     return prime;
+
+// }
+
+// ///////////
+
+
+void testGPU(bool (*func)(uint64_t, bool), bool gridstride = 1){
     // test numbers given in the task
 
     const int testlen = 6;
@@ -161,11 +243,17 @@ void testGPU(bool (*func)(uint64_t)){
     cudaDeviceSynchronize();
 
 
-    std::cout << "GPU primality test:\n";
+    std::cout << "GPU primality test: ";
+    if(gridstride == 1){
+        std::cout << "grid-stride version" << std::endl;
+    }
+    else{
+        std::cout << "monolithic kernel version" << std::endl;
+    }
     auto start = std::chrono::high_resolution_clock::now();    
 
     for(int i = 0; i < testlen; i++){
-        res[i] = func(num[i]);
+        res[i] = func(num[i], gridstride);
         std::cout << "Is number " << num[i] << " prime?: ";
         if(res[i] == 1){
             std::cout << " Yes it is" << std::endl;
@@ -182,6 +270,7 @@ void testGPU(bool (*func)(uint64_t)){
 
 }
 
+
 int main() {
 
     // CPU test
@@ -189,5 +278,6 @@ int main() {
 
     // Gpu test
     testGPU(&GPUgridstride);
+
 
 }
