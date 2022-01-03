@@ -273,6 +273,7 @@ void usertest(){
     else{
         std::cout << "(CPU) Number " << num << " is not prime"<< std::endl;
     }
+    cudaDeviceSynchronize();
     gpures = GPUprime(num, 1);
     if(gpures ==1){
         std::cout << "(GPU) Number " << num << " is prime"<< std::endl;
