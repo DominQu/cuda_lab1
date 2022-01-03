@@ -3,7 +3,7 @@
 #include <math.h>
 #include <chrono>
 #include <climits>
-
+#include <omp.h>
 
 // CPU section
 
@@ -29,6 +29,51 @@ bool CPUprime(uint64_t n){
             std::cout << "Test duration: " << duration.count() << " microseconds ";
             return false; 
         }
+    }
+
+    auto stop = std::chrono::high_resolution_clock::now();
+
+    auto duration = std::chrono::duration_cast<std::chrono::microseconds>(stop - start);
+    std::cout << "Test duration: " << duration.count() << " microseconds ";
+
+    return true;
+}
+
+void concurrentTest(const uint64_t& n, uint32_t& res, int threadId, int numthreads, const uint32_t& maxind){
+    std::cout << numthreads << std::endl;
+    for(uint32_t i = threadId;
+        5 + i * 6 <= maxind - 2;
+        i += numthreads)
+        {
+            uint32_t realindex = 5 + i * 6;
+
+            if(n % realindex == 0 || n % (realindex+2) == 0)
+            {
+                res = 0;
+            }
+        }
+}
+bool concurrentPrime(uint64_t n){
+
+    auto start = std::chrono::high_resolution_clock::now();
+
+    uint32_t res = 1;
+    uint32_t maxind = (uint32_t)std::floor(std::sqrt(n));
+    int threadId;
+    int numthreads;
+#pragma omp parallel default(shared) private(threadId, numthreads)
+    {
+        threadId = omp_get_thread_num();
+        numthreads = omp_get_num_threads();
+
+        concurrentTest(n, res, threadId, numthreads, maxind);
+    }
+    if( res == 0){
+        auto stop = std::chrono::high_resolution_clock::now();
+
+        auto duration = std::chrono::duration_cast<std::chrono::microseconds>(stop - start);
+        std::cout << "Test duration: " << duration.count() << " microseconds ";
+        return false;
     }
 
     auto stop = std::chrono::high_resolution_clock::now();
@@ -248,6 +293,8 @@ int main() {
     // testGPU(&GPUprime);
 
     usertest();
+
+    
 
 
 }
