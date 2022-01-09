@@ -40,7 +40,7 @@ bool CPUprime(uint64_t n){
 }
 
 void concurrentTest(const uint64_t& n, uint32_t& res, int threadId, int numthreads, const uint32_t& maxind){
-    std::cout << numthreads << std::endl;
+    
     for(uint32_t i = threadId;
         5 + i * 6 <= maxind - 2;
         i += numthreads)
@@ -260,12 +260,12 @@ void testGPU(bool (*func)(uint64_t, bool), bool gridstride = 1){
 void usertest(){
 
     uint64_t num;
-    std::cout << "Podaj liczbe do testu: ";
+    std::cout << "Podaj liczbe do testu: " << std::endl;
     std::cin >> num;
     bool cpures;
     bool gpures;
 
-    std::cout << "\n";
+    std::cout << "\nCPU standard" << std::endl;
     cpures = CPUprime(num);
     if(cpures ==1){
         std::cout << "(CPU) Number " << num << " is prime" << std::endl;
@@ -273,8 +273,28 @@ void usertest(){
     else{
         std::cout << "(CPU) Number " << num << " is not prime"<< std::endl;
     }
+
+    std::cout << "CPU concurrent" << std::endl;
+    cpures = concurrentPrime(num);
+    if(cpures ==1){
+        std::cout << "(CPU) Number " << num << " is prime" << std::endl;
+    }
+    else{
+        std::cout << "(CPU) Number " << num << " is not prime"<< std::endl;
+    }
+
     cudaDeviceSynchronize();
+    std::cout << "GPU grid-stride loop" << std::endl;
     gpures = GPUprime(num, 1);
+    if(gpures ==1){
+        std::cout << "(GPU) Number " << num << " is prime"<< std::endl;
+    }
+    else{
+        std::cout << "(GPU) Number " << num << " is not prime"<< std::endl;
+    }
+
+    std::cout << "GPU monolithic kernel" << std::endl;
+    gpures = GPUprime(num, 0);
     if(gpures ==1){
         std::cout << "(GPU) Number " << num << " is prime"<< std::endl;
     }
@@ -289,11 +309,22 @@ int main() {
     // Aby przetestować liczby podane w instrukcji należy odkomentować poniższe funkcje.
     // Funkcja testGPU może przyjąć jeden dodatkowy argument typu bool, który pozwala wybrać 
     // czy używane będą monolityczne kernele czy pętla grid-stride.
+    bool test = false;
+    std::cout << "Wybierz rodzaj testu (wpisz 0 lub 1):\n0 - test automatyczny\n1 - testuj liczbe" << std::endl;
+    std::cin >> test;
+    if(test == 0) {
 
-    // testCPU(&CPUprime);
-    // testGPU(&GPUprime);
+        std::cout << "CPU concurrent" << std::endl;
+        testCPU(&concurrentPrime);
+        std::cout << "CPU standard" << std::endl;
+        testCPU(&CPUprime);
+        testGPU(&GPUprime);
+        testGPU(&GPUprime, false);
+    }
+    else {
+        usertest();
+    }
 
-    usertest();
 
     
 

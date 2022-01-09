@@ -26,7 +26,7 @@ NVCC          := $(CUDA_PATH)/bin/nvcc -ccbin $(HOST_COMPILER)
 
 # internal flags
 NVCCFLAGS   := -m${TARGET_SIZE}
-CCFLAGS     :=
+CCFLAGS     := -fopenmp
 LDFLAGS     :=
 
 
@@ -47,7 +47,7 @@ ALL_LDFLAGS += $(addprefix -Xlinker ,$(EXTRA_LDFLAGS))
 ################################################################################
 
 # Gencode arguments
-SMS ?= 30 35 37 50 52 60 61 70 75
+SMS ?=  35 37 50 52 60 61 70 75
 
 ifeq ($(SMS),)
 $(info >>> WARNING - no SM architectures have been specified - waiving sample <<<)
@@ -95,7 +95,7 @@ LIBRARIES :=
 # Target rules
 all: build
 
-build: vectorAdd
+build: lab1
 
 check.deps:
 ifeq ($(SAMPLE_ENABLED),0)
@@ -113,7 +113,7 @@ lab1.o:lab1.cu
 #	$(EXEC) $(NVCC) $(INCLUDES) $(ALL_CCFLAGS) $(GENCODE_FLAGS) -o $@ -c $<
 
 # W przypadku dodania nowego pliku trzeba dodac {nazwa_pliku}.o ponizej
-vectorAdd: lab1.o
+lab1: lab1.o
 	$(EXEC) $(NVCC) $(ALL_LDFLAGS) $(GENCODE_FLAGS) -o $@ $+ $(LIBRARIES)
 	$(EXEC) mkdir -p bin/
 	$(EXEC) cp $@ bin/
